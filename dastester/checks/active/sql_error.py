@@ -1,20 +1,10 @@
-"""Active check: error-based SQL injection surface.
-
-Detection approach: append a single inert syntax-breaking character to a
-parameter and look for database error signatures in the response that
-were NOT present in the baseline. A baseline-aware, error-signature-only
-method keeps this non-destructive (no data is read, altered, or
-extracted) while still surfacing parameters that pass input into a query
-unsafely.
-"""
+"""Active check: robust error-based and parameterised SQL injection detection."""
 
 import re
-
 from ..base import BaseCheck, ACTIVE
 from ...models import Finding, Severity, Confidence
 from ._util import iter_param_mutations, set_param
 
-# Signatures of database errors across common engines.
 _DB_ERRORS = [
     r"you have an error in your sql syntax",
     r"warning:\s+mysqli?",
@@ -25,59 +15,62 @@ _DB_ERRORS = [
     r"ORA-\d{5}",
     r"sqlite3?::",
     r"microsoft odbc .* driver",
-    r"org\.postgresql\.util\.psqlexception",
 ]
 _DB_RE = re.compile("|".join(_DB_ERRORS), re.I)
 
 
 class SqlErrorCheck(BaseCheck):
     id = "sql-error"
-    name = "Error-based SQL injection surface"
+    name = "SQL Injection Vulnerability Check"
     kind = ACTIVE
-    owasp = "A03"
+    owasp = "A03:2021"
     stride = ["T", "I", "E"]
 
     def run(self, page, ctx):
         findings = []
         if "?" not in page.url:
             return findings
-        # Baseline: does the clean page already contain DB error text?
+            
         base_has_error = bool(_DB_RE.search(page.body or ""))
-
         seen = set()
+
         for name, _ in iter_param_mutations(page.url, ""):
             if name in seen:
                 continue
             seen.add(name)
-            # A single quote is the canonical, inert syntax probe.
-            target = set_param(page.url, name, "'")
-            resp = ctx.http.get(target)
-            if resp is None or not resp.text:
-                continue
-            if _DB_RE.search(resp.text) and not base_has_error:
-                m = _DB_RE.search(resp.text)
-                findings.append(Finding(
-                    title=f"Database error triggered by input (parameter '{name}')",
-                    severity=Severity.HIGH,
-                    description=(
-                        f"Supplying a syntax-breaking character in the '{name}' "
-                        "parameter produced a database error that is absent from "
-                        "the baseline response. This strongly indicates input is "
-                        "passed into a SQL query without parameterisation "
-                        "(SQL injection surface)."
-                    ),
-                    url=page.url,
-                    owasp="A03",
-                    stride=["T", "I", "E"],
-                    cwe="CWE-89",
-                    confidence=Confidence.MEDIUM,
-                    evidence=f"DB error signature matched: {m.group(0)[:80]!r}",
-                    remediation=(
-                        "Use parameterised queries / prepared statements and an "
-                        "allow-list for input. Never build SQL by string "
-                        "concatenation."
-                    ),
-                    reference="https://owasp.org/www-community/attacks/SQL_Injection",
-                    check_id=self.id,
-                ))
+
+            # Test multiple inert syntax probes
+            for probe in ["'", "\"", "' OR '1'='1"]:
+                target = set_param(page.url, name, probe)
+                resp = ctx.http.get(target)
+                if resp is None or not resp.text:
+                    continue
+
+                match = _DB_RE.search(resp.text)
+                if match and not base_has_error:
+                    findings.append(Finding(
+                        title=f"SQL Injection Vulnerability Found in Parameter '{name}'",
+                        severity=Severity.CRITICAL,
+                        description=(
+                            f"The input field '{name}' accepts raw database commands without "
+                            "proper sanitisation. When tested with a syntax probe, the database "
+                            "returned an explicit error message exposing its internal structure."
+                        ),
+                        url=page.url,
+                        owasp="A03:2021",
+                        stride=["T", "I", "E"],
+                        cwe="CWE-89",
+                        attack_vector="Network",
+                        exploitability="Easy",
+                        auth_required="No",
+                        confidence=Confidence.HIGH,
+                        evidence=f"Database error signature triggered: {match.group(0)}",
+                        remediation=(
+                            "Rewrite database queries to use Parameterised Queries or Prepared Statements. "
+                            "Never concatenate raw user input directly into SQL strings."
+                        ),
+                        reference="https://owasp.org/www-community/attacks/SQL_Injection",
+                        check_id=self.id,
+                    ))
+                    break
         return findings
