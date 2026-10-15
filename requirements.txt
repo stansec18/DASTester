@@ -1,0 +1,14 @@
+# DASTester runtime dependencies
+requests>=2.31.0
+urllib3>=2.0.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+Jinja2>=3.1.0
+rich>=13.7.0
+PyYAML>=6.0
+
+# PDF rendering. WeasyPrint is the primary engine (pure HTML->PDF).
+# If system libs for WeasyPrint are unavailable, DASTester falls back to
+# xhtml2pdf automatically.
+weasyprint>=60.0
+xhtml2pdf>=0.2.11
