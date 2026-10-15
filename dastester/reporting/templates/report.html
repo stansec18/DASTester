@@ -21,7 +21,6 @@
   header.cover .sub { color: var(--muted); font-size: 14px; }
   h2 { font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid var(--border);
        padding-bottom: 6px; }
-  h3 { font-size: 16px; margin: 20px 0 8px; }
   .meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 24px;
                background: var(--card); border: 1px solid var(--border);
                border-radius: 8px; padding: 16px; }
@@ -53,12 +52,10 @@
   .finding .fb { padding: 12px 14px; }
   .kv { margin: 4px 0; }
   .kv b { color: var(--muted); font-weight: 600; display: inline-block;
-          min-width: 110px; }
+          min-width: 150px; }
   code, .evidence { font-family: SFMono-Regular, Consolas, monospace; font-size: 12px;
          background: #eef1f4; padding: 1px 5px; border-radius: 4px;
          word-break: break-all; }
-  .tag { display: inline-block; background: #eef1f4; border: 1px solid var(--border);
-         border-radius: 6px; padding: 1px 7px; font-size: 11px; margin: 0 4px 4px 0; }
   footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border);
            color: var(--muted); font-size: 12px; }
   .note { background: #fff8e1; border: 1px solid #f0d98c; border-radius: 8px;
@@ -74,9 +71,8 @@
   </header>
 
   <div class="note">
-    This report was produced by automated dynamic testing against authorised
-    targets. Findings should be validated by a qualified analyst before
-    remediation prioritisation. Automated results may include false positives.
+    This report was produced by automated dynamic testing against authorised targets. 
+    Findings should be validated by a qualified analyst before remediation prioritisation.
   </div>
 
   <h2>Scan Overview</h2>
@@ -85,7 +81,7 @@
     <div><span>Pages scanned</span> {{ pages_scanned }}</div>
     <div><span>Started</span> {{ started }}</div>
     <div><span>Finished</span> {{ finished }}</div>
-    <div><span>Active checks</span> {{ "Enabled" if active else "Disabled (passive only)" }}</div>
+    <div><span>Active checks</span> {{ "Enabled" if active else "Disabled" }}</div>
     <div><span>Total findings</span> {{ findings|length }}</div>
   </div>
 
@@ -99,35 +95,9 @@
     {% endfor %}
   </div>
 
-  <h2>OWASP Top 10 (2021) Breakdown</h2>
-  <table>
-    <tr><th>Category</th><th>Findings</th><th>Description</th></tr>
-    {% for key, row in owasp_breakdown %}
-    <tr>
-      <td><b>{{ row.meta.id }}</b> — {{ row.meta.name }}</td>
-      <td>{{ row.count }}</td>
-      <td>{{ row.meta.description }}</td>
-    </tr>
-    {% endfor %}
-  </table>
-
-  <h2>STRIDE Threat Model Breakdown</h2>
-  <table>
-    <tr><th>Threat</th><th>Security property</th><th>Findings</th><th>Description</th></tr>
-    {% for code, row in stride_breakdown %}
-    <tr>
-      <td><b>{{ row.meta.code }}</b> — {{ row.meta.name }}</td>
-      <td>{{ row.meta.property }}</td>
-      <td>{{ row.count }}</td>
-      <td>{{ row.meta.description }}</td>
-    </tr>
-    {% endfor %}
-  </table>
-
   <h2>Findings ({{ findings|length }})</h2>
   {% if not findings %}
-  <p>No findings were produced. This does not guarantee the absence of
-     vulnerabilities — consider a deeper manual assessment.</p>
+  <p>No findings were produced.</p>
   {% endif %}
   {% for f in findings %}
   <div class="finding">
@@ -137,29 +107,20 @@
     </div>
     <div class="fb">
       <div class="kv"><b>Affected URL</b> <code>{{ f.url }}</code></div>
-      <div class="kv"><b>OWASP</b> {{ f.owasp_meta.id }} — {{ f.owasp_meta.name }}</div>
-      <div class="kv"><b>STRIDE</b>
-        {% for s in f.stride_meta %}<span class="tag">{{ s.code }} · {{ s.name }}</span>{% endfor %}
-      </div>
-      {% if f.cwe %}<div class="kv"><b>CWE</b> {{ f.cwe }}</div>{% endif %}
-      <div class="kv"><b>Confidence</b> {{ f.confidence }}</div>
+      <div class="kv"><b>OWASP Mapping</b> {{ f.owasp }} — {{ f.owasp_meta.name }}</div>
+      <div class="kv"><b>CWE / CVE</b> {{ f.cwe or 'N/A' }} {% if f.cve %}· {{ f.cve }}{% endif %}</div>
+      <div class="kv"><b>Attack Vector</b> {{ f.attack_vector }}</div>
+      <div class="kv"><b>Exploitability</b> {{ f.exploitability }}</div>
+      <div class="kv"><b>Authentication Required</b> {{ f.auth_required }}</div>
       <div class="kv"><b>Description</b> {{ f.description }}</div>
       {% if f.evidence %}<div class="kv"><b>Evidence</b> <span class="evidence">{{ f.evidence }}</span></div>{% endif %}
-      <div class="kv"><b>Remediation</b> {{ f.remediation }}</div>
-      {% if f.reference %}<div class="kv"><b>Reference</b> <a href="{{ f.reference }}">{{ f.reference }}</a></div>{% endif %}
-      <div class="kv"><b>Check</b> <code>{{ f.check_id }}</code> · id <code>{{ f.fingerprint }}</code></div>
+      <div class="kv"><b>Recommended Remediation</b> {{ f.remediation }}</div>
     </div>
   </div>
   {% endfor %}
 
-  {% if errors %}
-  <h2>Scan Notes / Errors</h2>
-  <ul>{% for e in errors %}<li><code>{{ e }}</code></li>{% endfor %}</ul>
-  {% endif %}
-
   <footer>
     Generated by DASTester v{{ version }} — authorised security testing tool.
-    OWASP Top 10 © OWASP Foundation. This document is confidential.
   </footer>
 </div>
 </body>
